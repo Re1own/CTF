@@ -1,0 +1,46 @@
+name: Unit tests
+on: [push, pull_request]
+
+jobs:
+  tests:
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+    - uses: actions/checkout@v2
+    - name: Cache for pip
+      uses: actions/cache@v1
+      with:
+        path: ~/.cache/pip
+        key: ${{ matrix.os }}-cache-pip
+
+    - name: Install dependencies
+      run: |
+        ./setup.sh --user
+        ./setup-test-tools.sh --user
+        pip install --user coveralls
+
+    - name: Python version info
+      run: |
+        echo 'GDB py:'
+        gdb --batch --quiet --nx --nh --ex 'py import sys; print(sys.version)'
+        echo 'Installed py:'
+        python -V
+
+    # We use `sudo` for `attachp` command tests
+    - name: Run tests
+      run: |
+        PWNDBG_GITHUB_ACTIONS_TEST_RUN=1 sudo --preserve-env ./tests.sh
+
+    - name: Process coverage data
+      run: |
+        coverage combine
+        coverage xml
+
+    - name: "Upload coverage to Codecov"
+      uses: codecov/codecov-action@v2
+      with:
+        fail_ci_if_error: true
+
